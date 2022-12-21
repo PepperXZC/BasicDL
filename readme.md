@@ -1,0 +1,3 @@
+For the convenience that I may frequently pull this repository and apply its content, I kept the Chinese name of each part of the content. 
+
+Related algs are not robust for all the functions are designed based on varied form of dataset. The quotation of dataset is not formal, either. I'll be sorry if someone take time to censor my codes. But, if needed and available, I may optimize my functions for others' convenience. You can actually find better verions in CSDN, though. :)
