@@ -1,18 +1,7 @@
-import d2l
 import torch
-import torchvision
 from torch.utils import data
-from torchvision import transforms
 from torch import nn
 from d2l import torch as d2l
-import sys
-from torch.utils.data import  Dataset, DataLoader, TensorDataset
-import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.cluster import KMeans
-# from sklearn.datasets.samples_generator import make_blobs
-from sklearn import metrics
-import matplotlib.pyplot as plt
 
 import pandas as pd
 
@@ -29,30 +18,6 @@ class Accumulator:  #@save
 
     def __getitem__(self, idx):
         return self.data[idx]
-
-def get_dataloader_workers():  #@save
-    """在非Windows的平台上，使用4个进程来读取数据"""
-    return 0 if sys.platform.startswith('win') else 4
-
-# def load_data_fashion_mnist(batch_size, resize=None):  #@save
-#     """下载Fashion-MNIST数据集，然后将其加载到内存中"""
-#     # 通过ToTensor实例将图像数据从PIL类型变换成32位浮点数格式，
-#     # 并除以255使得所有像素的数值均在0～1之间
-#     trans = [transforms.ToTensor()]
-#
-#     if resize:
-#         trans.insert(0, transforms.Resize(resize))
-#     trans = transforms.Compose(trans)
-#     mnist_train = torchvision.datasets.FashionMNIST(
-#         root="../data", train=True, transform=trans, download=True)
-#     mnist_test = torchvision.datasets.FashionMNIST(
-#         root="../data", train=False, transform=trans, download=True)
-#     return (data.DataLoader(mnist_train, batch_size, shuffle=True,
-#                             num_workers=get_dataloader_workers()),
-#             data.DataLoader(mnist_test, batch_size, shuffle=False,
-#                             num_workers=get_dataloader_workers()))
-
-# num_inputs, num_outputs, num_hiddens = 784, 10, 256
 
 class RBF(nn.Module):
 
@@ -86,37 +51,6 @@ class RBF(nn.Module):
         out = self.Linear(hidden_out)
         return out
 
-batch_size = 256
-# train_iter, test_iter = load_data_fashion_mnist(batch_size)
-# trans = [transforms.ToTensor()]
-# sampler = data.RandomSampler(torchvision.datasets.FashionMNIST(
-#         root="../data", train=True, transform=trans, download=True), replacement=False, num_samples=None)
-# for i in sampler:
-#     print(i)
-def show_images(imgs, num_rows, num_cols, titles=None, scale=1.5):  #@save
-    """绘制图像列表"""
-    figsize = (num_cols * scale, num_rows * scale)
-    _, axes = d2l.plt.subplots(num_rows, num_cols, figsize=figsize)
-    axes = axes.flatten()
-    for i, (ax, img) in enumerate(zip(axes, imgs)):
-        if torch.is_tensor(img):
-            # 图片张量
-            ax.imshow(img.numpy())
-        else:
-            # PIL图片
-            ax.imshow(img)
-        ax.axes.get_xaxis().set_visible(False)
-        ax.axes.get_yaxis().set_visible(False)
-        if titles:
-            ax.set_title(titles[i])
-    return axes
-
-def get_fashion_mnist_labels(labels):  #@save
-    """返回Fashion-MNIST数据集的文本标签"""
-    text_labels = ['t-shirt', 'trouser', 'pullover', 'dress', 'coat',
-                   'sandal', 'shirt', 'sneaker', 'bag', 'ankle boot']
-    return [text_labels[int(i)] for i in labels]
-
 def make_dataset(batch_size):
     data = pd.read_excel('数据.xlsx', index_col=0)
     # print(data)
@@ -130,7 +64,7 @@ def make_dataset(batch_size):
         centers[i] = torch.tensor(data[index_list[i]][:-1])
     test_num = len(data) // (batch_size + 1)
     # 中心点samples, train_set, test_set
-    return centers, torch.tensor(data[:-test_num]), torch.tensor(data[-test_num:])
+    return centers / 10, torch.tensor(data[:-test_num]) / 10, torch.tensor(data[-test_num:]) / 10
 
 class iter_dataset:
     def __init__(self, data, batch_size):
@@ -208,7 +142,7 @@ if __name__ == '__main__':
     loss = nn.MSELoss()
     batch_size = 15
     centers, train_set, test_set = make_dataset(batch_size)
-    num_epochs, lr,  = 200, 0.1
+    num_epochs, lr,  = 200, 0.01
 
     train_iter, test_iter = iter_dataset(train_set, batch_size), iter_dataset(test_set, batch_size)
 
@@ -224,7 +158,3 @@ if __name__ == '__main__':
         # animator.add(epoch + 1, train_metrics + test_acc)
         print(train_metrics, test_acc)
     train_loss = train_metrics
-    # a = torch.tensor([0, 1, 2, 0, 3, 4, 0, 5, 6, 0, 0, 0, 0, 0, 0])
-    # a = a[[not torch.all(a[i] == 0) for i in range(len(a))]]
-    # print(a)
-    # print()

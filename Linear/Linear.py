@@ -7,7 +7,20 @@ from torch.utils import data
 from IPython import display
 from PIL import Image
 
+
+net = nn.Sequential(nn.Flatten(),
+                    nn.Linear(784, 256),
+                    nn.ReLU(),
+                    nn.Linear(256, 10))
+
+def init_weights(m):
+    if type(m) == nn.Linear:
+        nn.init.normal_(m.weight, std=0.01)
+
 def get_dataloader_workers():
+    """Use 4 processes to read the data.
+
+    Defined in :numref:`sec_fashion_mnist`"""
     return 4
 
 def load_data_fashion_mnist(batch_size, resize=None):
@@ -28,7 +41,9 @@ def load_data_fashion_mnist(batch_size, resize=None):
                             num_workers=get_dataloader_workers()))
 
 class Accumulator:
+    """For accumulating sums over `n` variables."""
     def __init__(self, n):
+        """Defined in :numref:`sec_softmax_scratch`"""
         self.data = [0.0] * n
 
     def add(self, *args):
@@ -40,22 +55,21 @@ class Accumulator:
     def __getitem__(self, idx):
         return self.data[idx]
 
-def softmax(X):
-    X_exp = torch.exp(X)
-    partition = X_exp.sum(1, keepdim=True)
-    return X_exp / partition  # 这里应用了广播机制
-
-def net(X):
-    return softmax(torch.matmul(X.reshape((-1, W.shape[0])), W) + b)
-
 def accuracy(y_hat, y):
+    """Compute the number of correct predictions.
+
+    Defined in :numref:`sec_softmax_scratch`"""
     if len(y_hat.shape) > 1 and y_hat.shape[1] > 1:
-        y_hat = torch.argmax(y_hat, axis=1)
+        y_hat = d2l.argmax(y_hat, axis=1)
     cmp = d2l.astype(y_hat, y.dtype) == y
     return float(d2l.reduce_sum(d2l.astype(cmp, y.dtype)))
 
 def evaluate_accuracy(net, data_iter):
-    net.eval()  # Set the model to evaluation mode
+    """Compute the accuracy for a model on a dataset.
+
+    Defined in :numref:`sec_softmax_scratch`"""
+    if isinstance(net, torch.nn.Module):
+        net.eval()  # Set the model to evaluation mode
     metric = Accumulator(2)  # No. of correct predictions, no. of predictions
 
     with torch.no_grad():
@@ -63,34 +77,53 @@ def evaluate_accuracy(net, data_iter):
             metric.add(accuracy(net(X), y), d2l.size(y))
     return metric[0] / metric[1]
 
-def train_epoch(net, train_iter, loss, updater):  #@save
-    net.train()
+def train_epoch_ch3(net, train_iter, loss, updater):
+    """The training loop defined in Chapter 3.
+
+    Defined in :numref:`sec_softmax_scratch`"""
+    # Set the model to training mode
+    if isinstance(net, torch.nn.Module):
+        net.train()
+    # Sum of training loss, sum of training accuracy, no. of examples
     metric = Accumulator(3)
     for X, y in train_iter:
+        # Compute gradients and update parameters
         y_hat = net(X)
         l = loss(y_hat, y)
-        updater.zero_grad()
-        l.mean().backward()
-        updater.step()
+        if isinstance(updater, torch.optim.Optimizer):
+            # Using PyTorch in-built optimizer & loss criterion
+            updater.zero_grad()
+            l.mean().backward()
+            updater.step()
+        else:
+            # Using custom built optimizer & loss criterion
+            l.sum().backward()
+            updater(X.shape[0])
         metric.add(float(l.sum()), accuracy(y_hat, y), y.numel())
+    # Return training loss and training accuracy
     return metric[0] / metric[2], metric[1] / metric[2]
 
-class Animator:  #@save
+class Animator:
+    """For plotting data in animation."""
     def __init__(self, xlabel=None, ylabel=None, legend=None, xlim=None,
                  ylim=None, xscale='linear', yscale='linear',
                  fmts=('-', 'm--', 'g-.', 'r:'), nrows=1, ncols=1,
                  figsize=(3.5, 2.5)):
+        """Defined in :numref:`sec_softmax_scratch`"""
+        # Incrementally plot multiple lines
         if legend is None:
             legend = []
         d2l.use_svg_display()
         self.fig, self.axes = d2l.plt.subplots(nrows, ncols, figsize=figsize)
         if nrows * ncols == 1:
             self.axes = [self.axes, ]
+        # Use a lambda function to capture arguments
         self.config_axes = lambda: d2l.set_axes(
             self.axes[0], xlabel, ylabel, xlim, ylim, xscale, yscale, legend)
         self.X, self.Y, self.fmts = None, None, fmts
 
     def add(self, x, y):
+        # Add multiple data points into the figure
         if not hasattr(y, "__len__"):
             y = [y]
         n = len(y)
@@ -108,37 +141,34 @@ class Animator:  #@save
         for x, y, fmt in zip(self.X, self.Y, self.fmts):
             self.axes[0].plot(x, y, fmt)
         self.config_axes()
-        display.display(self.fig)
-        display.clear_output(wait=True)
+        # display.display(self.fig)
+        # image_path = "result.jpeg"
+        # display.display(Image( filename =  image_path ))
+        # display.clear_output(wait=True)
 
-def train_ch3(net, train_iter, test_iter, loss, num_epochs, updater):  #@save
+def train_ch3(net, train_iter, test_iter, loss, num_epochs, updater):
+    """Train a model (defined in Chapter 3).
+
+    Defined in :numref:`sec_softmax_scratch`"""
     animator = Animator(xlabel='epoch', xlim=[1, num_epochs], ylim=[0.3, 0.9],
                         legend=['train loss', 'train acc', 'test acc'])
     for epoch in range(num_epochs):
-        train_metrics = train_epoch(net, train_iter, loss, updater)
+        train_metrics = train_epoch_ch3(net, train_iter, loss, updater)
         test_acc = evaluate_accuracy(net, test_iter)
         animator.add(epoch + 1, train_metrics + (test_acc,))
     train_loss, train_acc = train_metrics
+    assert train_loss < 0.5, train_loss
+    assert train_acc <= 1 and train_acc > 0.7, train_acc
+    assert test_acc <= 1 and test_acc > 0.7, test_acc
 
 
-batch_size = 256
-
-train_iter, test_iter = load_data_fashion_mnist(batch_size)
-
-net = nn.Sequential(nn.Flatten(), nn.Linear(784, 10))
-
-def init_weights(m):
-    if type(m) == nn.Linear:
-        nn.init.normal_(m.weight, std=0.01)
 
 net.apply(init_weights)
 
-updater = torch.optim.SGD(net.parameters(), lr=0.1)
-
-num_epochs = 10
-
+batch_size, lr, num_epochs = 256, 0.1, 10
 loss = nn.CrossEntropyLoss(reduction='none')
+trainer = torch.optim.SGD(net.parameters(), lr=lr)
 
-train_ch3(net, train_iter, test_iter, loss, num_epochs, updater)
-
+train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
+train_ch3(net, train_iter, test_iter, loss, num_epochs, trainer)
 d2l.plt.show()
