@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from d2l import torch as d2l
+import matplotlib.pyplot as plt
 from torchvision import transforms
 import torchvision
 from torch.utils import data
@@ -141,4 +142,4 @@ loss = nn.CrossEntropyLoss(reduction='none')
 
 train_ch3(net, train_iter, test_iter, loss, num_epochs, updater)
 
-d2l.plt.show()
+plt.show()
